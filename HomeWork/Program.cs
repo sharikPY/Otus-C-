@@ -6,17 +6,13 @@ namespace FastPekar
 {
     class Program
     {
-        // Список задач — доступен всем методам класса
         static List<string> tasks = new List<string>();
 
-        // Лимиты, задаются при старте
         static int maxTaskCount;
         static int maxTaskLength;
 
         static void Main(string[] args)
         {
-            // Инициализация лимитов ДО основного цикла —
-            // её ошибки обрабатываются отдельным try/catch
             try
             {
                 maxTaskCount = ReadLimit(
@@ -29,7 +25,6 @@ namespace FastPekar
             }
             catch (ArgumentException ex)
             {
-                // Если лимиты заданы неверно — работать дальше нельзя
                 Console.WriteLine(ex.Message);
                 return;
             }
@@ -84,7 +79,6 @@ namespace FastPekar
                 }
                 catch (ArgumentException ex)
                 {
-                    // Только сообщение — для ошибок валидации
                     Console.WriteLine(ex.Message);
                 }
                 catch (TaskCountLimitException ex)
@@ -101,7 +95,6 @@ namespace FastPekar
                 }
                 catch (Exception ex)
                 {
-                    // Глобальный перехват — печатаем всё, что есть
                     Console.WriteLine("Произошла непредвиденная ошибка:");
                     Console.WriteLine($"  Type:           {ex.GetType().FullName}");
                     Console.WriteLine($"  Message:        {ex.Message}");
@@ -111,12 +104,6 @@ namespace FastPekar
             }
         }
 
-        // ================= ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ =================
-
-        /// <summary>
-        /// Читает строку, парсит в int и проверяет диапазон [min, max].
-        /// Бросает ArgumentException при любой ошибке.
-        /// </summary>
         static int ParseAndValidateInt(string str, int min, int max)
         {
             if (string.IsNullOrWhiteSpace(str))
@@ -138,10 +125,6 @@ namespace FastPekar
             return value;
         }
 
-        /// <summary>
-        /// Проверяет, что строка не null, не пустая и не состоит из пробелов.
-        /// Бросает ArgumentException в противном случае.
-        /// </summary>
         static void ValidateString(string str)
         {
             if (str == null)
@@ -155,9 +138,6 @@ namespace FastPekar
             }
         }
 
-        /// <summary>
-        /// Универсальное чтение лимита с консоли через ParseAndValidateInt.
-        /// </summary>
         static int ReadLimit(string prompt, int min, int max)
         {
             while (true)
@@ -171,12 +151,10 @@ namespace FastPekar
                 catch (ArgumentException ex)
                 {
                     Console.WriteLine(ex.Message);
-                    // повторяем ввод, пока пользователь не введёт корректное значение
                 }
             }
         }
 
-        // ================= ПРИВЕТСТВИЕ И СПРАВКА =================
 
         static void PrintWelcomeMessage()
         {
@@ -237,8 +215,6 @@ namespace FastPekar
             Console.WriteLine("Версия:     1.0.0");
             Console.WriteLine("Дата создания: 26.09.2026");
         }
-
-        // ================= СТАРЫЕ КОМАНДЫ =================
 
         static void HandleStart(ref string userName)
         {
@@ -306,30 +282,25 @@ namespace FastPekar
             Console.WriteLine($"{userName}, ваш текст: {argument}");
         }
 
-        // ================= НОВЫЕ КОМАНДЫ =================
 
         static void HandleAddTask()
         {
-            // 1. Проверка лимита количества
             if (tasks.Count >= maxTaskCount)
             {
                 throw new TaskCountLimitException(maxTaskCount);
             }
 
-            // 2. Чтение и валидация описания
             Console.Write("Введите описание задачи: ");
             string description = Console.ReadLine();
 
             ValidateString(description);           // бросит ArgumentException, если пусто
             string trimmed = description.Trim();
 
-            // 3. Проверка длины
             if (trimmed.Length > maxTaskLength)
             {
                 throw new TaskLengthLimitException(trimmed.Length, maxTaskLength);
             }
 
-            // 4. Проверка на дубликат
             if (tasks.Contains(trimmed))
             {
                 throw new DuplicateTaskException(trimmed);
@@ -398,7 +369,6 @@ namespace FastPekar
                 catch (ArgumentException ex)
                 {
                     Console.WriteLine($"Ошибка: {ex.Message}");
-                    // продолжаем цикл — снова просим номер
                 }
             }
         }
