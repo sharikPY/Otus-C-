@@ -6,8 +6,11 @@ namespace FastPekar
 {
     class Program
     {
-        static List<string> tasks = new List<string>();
-
+        public const int MinTaskCount = 1;
+        public const int MaxTaskCount = 100;
+        public const int MinTaskLength = 1;
+        public const int MaxTaskLength = 100;
+        static readonly List<ToDoItem> tasks = new List<ToDoItem>();
         static int maxTaskCount;
         static int maxTaskLength;
 
@@ -17,11 +20,11 @@ namespace FastPekar
             {
                 maxTaskCount = ReadLimit(
                     "Введите максимально допустимое количество задач",
-                    min: 1, max: 100);
+                    min: MinTaskCount, max: MaxTaskCount);
 
                 maxTaskLength = ReadLimit(
                     "Введите максимально допустимую длину задачи",
-                    min: 1, max: 100);
+                    min: MinTaskCount, max: MaxTaskCount);
             }
             catch (ArgumentException ex)
             {
@@ -30,7 +33,7 @@ namespace FastPekar
             }
 
             PrintWelcomeMessage();
-            string userName = null;
+            ToDoUser user = null;
 
             while (true)
             {
@@ -63,14 +66,16 @@ namespace FastPekar
 
                     switch (command)
                     {
-                        case "/start": HandleStart(ref userName); break;
-                        case "/help": HandleHelp(userName); break;
+                        case "/start": HandleStart(ref user); break;
+                        case "/help": HandleHelp(user); break;
                         case "/info": HandleInfo(); break;
-                        case "/echo": HandleEcho(ref userName, argument); break;
-                        case "/addtask": HandleAddTask(); break;
+                        case "/echo": HandleEcho(ref user, argument); break;
+                        case "/addtask": HandleAddTask(user); break;
                         case "/showtasks": HandleShowTasks(); break;
+                        case "/showalltasks": HandleShowAllTasks(); break;
+                        case "/completetask": HandleCompleteTask(argument); break;
                         case "/removetask": HandleRemoveTask(); break;
-                        case "/exit": HandleExit(userName); return;
+                        case "/exit": HandleExit(user); return;
 
                         default:
                             Console.WriteLine("Неизвестная команда. Введите /help для справки.");
@@ -104,37 +109,51 @@ namespace FastPekar
             }
         }
 
-        static int ParseAndValidateInt(string str, int min, int max)
+        public static int ParseAndValidateInt(string str, int min, int max)
         {
+            if (str == null)
+            {
+                throw new ArgumentException(
+                    "Введено null-значение вместо числа. Ожидалась строка с целым числом.");
+            }
+
             if (string.IsNullOrWhiteSpace(str))
             {
-                throw new ArgumentException("Введено пустое значение. Ожидалось число.");
+                throw new ArgumentException(
+                    "Введено пустое значение или строка из пробелов. " +
+                    $"Введите целое число в диапазоне от {min} до {max}.");
             }
 
             if (!int.TryParse(str.Trim(), out int value))
             {
-                throw new ArgumentException($"Значение '{str}' не является числом.");
+                throw new ArgumentException(
+                    $"Значение '{str.Trim()}' не является целым числом. " +
+                    $"Введите целое число в диапазоне от {min} до {max}.");
             }
 
             if (value < min || value > max)
             {
                 throw new ArgumentException(
-                    $"Значение {value} должно быть в диапазоне от {min} до {max}.");
+                    $"Значение {value} выходит за допустимые границы. " +
+                    $"Допустимый диапазон: от {min} до {max}.");
             }
 
             return value;
         }
 
-        static void ValidateString(string str)
+        public static void ValidateString(string str)
         {
             if (str == null)
             {
-                throw new ArgumentException("Строка не может быть null.");
+                throw new ArgumentException(
+                    "Передано null-значение. Ожидалась непустая строка.");
             }
 
             if (string.IsNullOrWhiteSpace(str))
             {
-                throw new ArgumentException("Строка не может быть пустой или состоять из пробелов.");
+                throw new ArgumentException(
+                    "Строка пуста или состоит только из пробелов. " +
+                    "Введите осмысленное значение.");
             }
         }
 
@@ -173,7 +192,9 @@ namespace FastPekar
             Console.WriteLine("  /help       - справка по плюшкам");
             Console.WriteLine("  /info       - информация о пекарне");
             Console.WriteLine("  /addtask    - добавить новую задачу");
-            Console.WriteLine("  /showtasks  - показать все задачи");
+            Console.WriteLine("  /showtasks  - показать все активные задачи");
+            Console.WriteLine("  /showalltasks - показать все задачи (любой State)");
+            Console.WriteLine("  /completetask - отметить задачу выполненной по Id");
             Console.WriteLine("  /removetask - удалить задачу по номеру");
             Console.WriteLine("  /exit       - выйти из пекарни Fast Пекарь");
             Console.WriteLine();
@@ -181,9 +202,9 @@ namespace FastPekar
             Console.WriteLine("============================================================");
         }
 
-        static void HandleHelp(string userName)
+        static void HandleHelp(ToDoUser user)
         {
-            string greeting = userName != null ? $"{userName}, " : "";
+            string greeting = user != null ? $"{user.TelegramUserName}, " : "";
 
             Console.WriteLine($"{greeting}справка по использованию Fast Пекарь:");
             Console.WriteLine();
@@ -191,10 +212,12 @@ namespace FastPekar
             Console.WriteLine("  /help       - показать справочку по плюшкам");
             Console.WriteLine("  /info       - информация о пекарне");
             Console.WriteLine("  /addtask    - добавить новую задачу в список");
-            Console.WriteLine("  /showtasks  - показать список всех задач");
+            Console.WriteLine("  /showtasks  - показать список активных задач");
+            Console.WriteLine("  /showalltasks - показать список всех задач");
+            Console.WriteLine("  /completetask - отметить задачу выполненной по Id");
             Console.WriteLine("  /removetask - удалить задачу по её номеру");
             Console.WriteLine("  /exit       - выйти из пекарни");
-            if (userName == null)
+            if (user == null)
             {
                 Console.WriteLine();
                 Console.WriteLine("Для того чтобы поздороваться с пекарями и разблочить команду /echo напишите /start.");
@@ -216,10 +239,14 @@ namespace FastPekar
             Console.WriteLine("Дата создания: 26.09.2026");
         }
 
-        static void HandleStart(ref string userName)
+        static void HandleStart(ref ToDoUser user)
         {
-            userName = AskUserName();
-            Console.WriteLine($"Приятно познакомиться, {userName}!");
+            string telegramUserName = AskUserName();
+            user = new ToDoUser(telegramUserName);
+
+            Console.WriteLine($"Приятно познакомиться, {user.TelegramUserName}!");
+            Console.WriteLine($"Ваш UserId: {user.UserId}");
+            Console.WriteLine($"Дата регистрации (UTC): {user.RegisteredAt:yyyy-MM-dd HH:mm:ss}");
             Console.WriteLine("Теперь вам доступна команда /echo.");
         }
 
@@ -252,39 +279,47 @@ namespace FastPekar
             }
         }
 
-        static void HandleEcho(ref string userName, string argument)
+        static void HandleEcho(ref ToDoUser user, string argument)
         {
-            if (userName == null)
+            if (user == null)
             {
                 Console.WriteLine("Неприлично сразу что-то требовать. Давайте познакомимся.");
 
-                userName = AskUserName();
-                Console.WriteLine($"Приятно познакомиться, {userName}!");
+                string telegramUserName = AskUserName();
+                user = new ToDoUser(telegramUserName);
+
+                Console.WriteLine($"Приятно познакомиться, {user.TelegramUserName}!");
 
                 if (!string.IsNullOrWhiteSpace(argument))
                 {
-                    Console.WriteLine($"{userName}, ваш текст: {argument}");
+                    Console.WriteLine($"{user.TelegramUserName}, ваш текст: {argument}");
                 }
                 else
                 {
                     Console.WriteLine("Теперь вы можете использовать команду: /echo <текст>");
-                    Console.WriteLine($"Например: /echo Привет, {userName}!");
+                    Console.WriteLine($"Например: /echo Привет, {user.TelegramUserName}!");
                 }
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(argument))
             {
-                Console.WriteLine($"{userName}, Про плюшки то напиши. Пример: /echo вкусные лавашики");
+                Console.WriteLine($"{user.TelegramUserName}, Про плюшки то напиши. Пример: /echo вкусные лавашики");
                 return;
             }
 
-            Console.WriteLine($"{userName}, ваш текст: {argument}");
+            Console.WriteLine($"{user.TelegramUserName}, ваш текст: {argument}");
         }
 
 
-        static void HandleAddTask()
+        static void HandleAddTask(ToDoUser user)
         {
+            if (user == null)
+            {
+                Console.WriteLine("Сначала войдите в пекарню командой /start.");
+                return;
+            }
+
             if (tasks.Count >= maxTaskCount)
             {
                 throw new TaskCountLimitException(maxTaskCount);
@@ -301,16 +336,36 @@ namespace FastPekar
                 throw new TaskLengthLimitException(trimmed.Length, maxTaskLength);
             }
 
-            if (tasks.Contains(trimmed))
+            if (tasks.Any(t => t.Name == trimmed))
             {
                 throw new DuplicateTaskException(trimmed);
             }
 
-            tasks.Add(trimmed);
-            Console.WriteLine($"Задача добавлена: \"{trimmed}\"");
+            var item = new ToDoItem(user, trimmed);
+            tasks.Add(item);
+            Console.WriteLine($"Задача добавлена: \"{item.Name}\" (Id: {item.Id})");
         }
 
         static void HandleShowTasks()
+        {
+            var activeTasks = tasks.Where(t => t.State == ToDoItemState.Active).ToList();
+
+            if (activeTasks.Count == 0)
+            {
+                Console.WriteLine("Список активных задач пуст.");
+                return;
+            }
+
+            Console.WriteLine("Список активных задач:");
+            for (int i = 0; i < activeTasks.Count; i++)
+            {
+                var item = activeTasks[i];
+                Console.WriteLine(
+                    $"  {i + 1}. {item.Name} - {item.CreatedAt:dd.MM.yyyy HH:mm:ss} - {item.Id}");
+            }
+        }
+
+        static void HandleShowAllTasks()
         {
             if (tasks.Count == 0)
             {
@@ -318,10 +373,108 @@ namespace FastPekar
                 return;
             }
 
-            Console.WriteLine("Список задач:");
+            Console.WriteLine("Список всех задач:");
             for (int i = 0; i < tasks.Count; i++)
             {
-                Console.WriteLine($"  {i + 1}. {tasks[i]}");
+                var item = tasks[i];
+                Console.WriteLine(
+                    $"  {i + 1}. ({item.State}) {item.Name} - " +
+                    $"{item.CreatedAt:dd.MM.yyyy HH:mm:ss} - {item.Id}");
+            }
+        }
+
+        static void HandleCompleteTask(string argument)
+        {
+            if (string.IsNullOrWhiteSpace(argument))
+            {
+                Console.WriteLine("Укажите Id задачи. Пример: /completetask 73c7940a-ca8c-4327-8a15-9119bffd1d5e");
+                return;
+            }
+
+            if (!Guid.TryParse(argument.Trim(), out Guid id))
+            {
+                Console.WriteLine($"'{argument.Trim()}' не является корректным Guid. " +
+                                  "Пример: /completetask 73c7940a-ca8c-4327-8a15-9119bffd1d5e");
+                return;
+            }
+
+            var item = tasks.FirstOrDefault(t => t.Id == id);
+
+            if (item == null)
+            {
+                Console.WriteLine($"Задача с Id {id} не найдена.");
+                return;
+            }
+
+            if (item.State == ToDoItemState.Completed)
+            {
+                Console.WriteLine($"Задача \"{item.Name}\" уже выполнена ({item.StateChangedAt:dd.MM.yyyy HH:mm:ss}).");
+                return;
+            }
+
+            item.State = ToDoItemState.Completed;
+            item.StateChangedAt = DateTime.UtcNow;
+
+            Console.WriteLine(
+                $"Задача \"{item.Name}\" отмечена как выполненная. " +
+                $"StateChangedAt: {item.StateChangedAt:dd.MM.yyyy HH:mm:ss} UTC");
+        }
+
+        static int AskTaskNumberForRemoval()
+        {
+            while (true)
+            {
+                Console.Write(
+                    $"Введите номер задачи для удаления (1–{tasks.Count}, " +
+                    "Esc — отмена, слово «отмена» — тоже отмена): ");
+
+                var key = Console.ReadKey(intercept: true);
+
+                // Выход по Esc
+                if (key.Key == ConsoleKey.Escape)
+                {
+                    Console.WriteLine();
+                    Console.WriteLine("Удаление отменено.");
+                    return -1;
+                }
+
+                // Собираем строку: уже прочитанный символ + остаток строки
+                string input;
+                if (key.Key == ConsoleKey.Enter)
+                {
+                    Console.WriteLine();
+                    input = string.Empty;
+                }
+                else
+                {
+                    // Эхо-вывод первого символа и чтение остатка
+                    Console.Write(key.KeyChar);
+                    input = key.KeyChar + Console.ReadLine();
+                }
+
+                if (string.IsNullOrWhiteSpace(input))
+                {
+                    Console.WriteLine("Ошибка: введите номер задачи.");
+                    continue;
+                }
+
+                string trimmed = input.Trim();
+
+                if (trimmed.Equals("отмена", StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine("Удаление отменено.");
+                    return -1;
+                }
+
+                try
+                {
+                    int number = ParseAndValidateInt(trimmed, 1, tasks.Count);
+                    return number;
+                }
+                catch (ArgumentException ex)
+                {
+                    Console.WriteLine($"Ошибка: {ex.Message}");
+                }
             }
         }
 
@@ -336,48 +489,25 @@ namespace FastPekar
             Console.WriteLine("Список задач:");
             for (int i = 0; i < tasks.Count; i++)
             {
-                Console.WriteLine($"  {i + 1}. {tasks[i]}");
+                Console.WriteLine($"  {i + 1}. {tasks[i].Name}");
             }
 
-            while (true)
+            int number = AskTaskNumberForRemoval();
+            if (number == -1)
             {
-                Console.Write("Введите номер задачи для удаления (или 'отмена'): ");
-                string input = Console.ReadLine();
-
-                if (string.IsNullOrWhiteSpace(input))
-                {
-                    Console.WriteLine("Ошибка: введите номер задачи.");
-                    continue;
-                }
-
-                string trimmed = input.Trim();
-
-                if (trimmed.ToLower() == "отмена")
-                {
-                    Console.WriteLine("Удаление отменено.");
-                    return;
-                }
-
-                try
-                {
-                    int number = ParseAndValidateInt(trimmed, 1, tasks.Count);
-                    string removed = tasks[number - 1];
-                    tasks.RemoveAt(number - 1);
-                    Console.WriteLine($"Задача удалена: \"{removed}\"");
-                    return;
-                }
-                catch (ArgumentException ex)
-                {
-                    Console.WriteLine($"Ошибка: {ex.Message}");
-                }
+                return;
             }
+
+            var removed = tasks[number - 1];
+            tasks.RemoveAt(number - 1);
+            Console.WriteLine($"Задача удалена: \"{removed.Name}\" (Id: {removed.Id})");
         }
 
-        static void HandleExit(string userName)
+        static void HandleExit(ToDoUser user)
         {
-            if (userName != null)
+            if (user != null)
             {
-                Console.WriteLine($"До свидания, {userName}! Спасибо за использование Fast Пекарь.");
+                Console.WriteLine($"До свидания, {user.TelegramUserName}! Спасибо за использование Fast Пекарь.");
             }
             else
             {
