@@ -1,4 +1,7 @@
-﻿using Otus.ToDoList.ConsoleBot;
+﻿using FastPekar.Core.DataAccess;
+using FastPekar.Infrastructure.DataAccess;
+using FastPekar.Services;
+using Otus.ToDoList.ConsoleBot;
 using System;
 
 namespace FastPekar
@@ -22,10 +25,12 @@ namespace FastPekar
                     "Введите максимально допустимую длину задачи",
                     min: MinTaskLength, max: MaxTaskLength);
 
-                IUserService userService = new UserService();
-                IToDoService toDoService = new ToDoService(maxTaskCount, maxTaskLength);
-
-                var handler = new UpdateHandler(userService, toDoService);
+                IUserRepository userRepository = new InMemoryUserRepository();
+                IToDoRepository toDoRepository = new InMemoryToDoRepository();
+                IUserService userService = new UserService(userRepository);
+                IToDoService toDoService = new ToDoService(toDoRepository, maxTaskCount, maxTaskLength);
+                IToDoReportService reportService = new ToDoReportService(toDoRepository);
+                var handler = new UpdateHandler(userService, toDoService, reportService); 
                 var botClient = new ConsoleBotClient();
                 botClient.StartReceiving(handler);
             }
@@ -77,7 +82,7 @@ namespace FastPekar
             while (true)
             {
                 Console.Write($"{prompt}: ");
-                string input = Console.ReadLine();
+                string? input = Console.ReadLine();
                 try
                 {
                     return ParseAndValidateInt(input, min, max);

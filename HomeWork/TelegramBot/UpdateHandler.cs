@@ -1,7 +1,8 @@
-﻿using System;
-using System.Linq;
+﻿using FastPekar.Services;
 using Otus.ToDoList.ConsoleBot;
 using Otus.ToDoList.ConsoleBot.Types;
+using System;
+using System.Linq;
 
 namespace FastPekar
 {
@@ -9,11 +10,14 @@ namespace FastPekar
     {
         private readonly IUserService _userService;
         private readonly IToDoService _toDoService;
+        private readonly IToDoReportService _reportService;
 
-        public UpdateHandler(IUserService userService, IToDoService toDoService)
+        public UpdateHandler(IUserService userService, IToDoService toDoService,
+                     IToDoReportService reportService)
         {
             _userService = userService;
             _toDoService = toDoService;
+            _reportService = reportService;
         }
 
         public void HandleUpdateAsync(ITelegramBotClient botClient, Update update)
@@ -65,13 +69,13 @@ namespace FastPekar
                         HandleInfo(botClient, chat);
                         break;
                     case "/addtask":
-                        HandleAddTask(botClient, chat, user, argument);
+                        HandleAddTask(botClient, chat, user!, argument);
                         break;
                     case "/showtasks":
-                        HandleShowTasks(botClient, chat, user);
+                        HandleShowTasks(botClient, chat, user!);
                         break;
                     case "/showalltasks":
-                        HandleShowAllTasks(botClient, chat, user);
+                        HandleShowAllTasks(botClient, chat, user!);
                         break;
                     case "/completetask":
                         HandleCompleteTask(botClient, chat, argument);
@@ -79,11 +83,18 @@ namespace FastPekar
                     case "/removetask":
                         HandleRemoveTask(botClient, chat, argument);
                         break;
+                    case "/report":
+                        HandleReport(botClient, chat, user!);
+                        break;
+                    case "/find":
+                        HandleFind(botClient, chat, user!, argument);
+                        break;
                     case "/exit":
                         botClient.SendMessage(chat, user != null
                             ? $"До свидания, {user.TelegramUserName}!"
                             : "До свидания, незнакомец!");
                         break;
+                    
                     default:
                         botClient.SendMessage(chat, "Неизвестная команда. Введите /help для справки.");
                         break;
@@ -137,6 +148,8 @@ namespace FastPekar
                 "  /showalltasks - показать все задачи",
                 "  /completetask <Id> - отметить задачу выполненной",
                 "  /removetask <Id>   - удалить задачу по Id",
+                "  /report       - статистика по задачам",
+                "  /find <префикс> - найти задачи по началу имени",
                 "  /exit         - выйти"
             };
             botClient.SendMessage(chat, string.Join("\n", lines));
@@ -228,6 +241,36 @@ namespace FastPekar
 
             _toDoService.Delete(id);
             botClient.SendMessage(chat, $"Задача с Id {id} удалена (если была найдена).");
+        }
+        private void HandleReport(ITelegramBotClient botClient, Chat chat, ToDoUser user)
+        {
+            var (total, completed, active, generatedAt) = _reportService.GetUserStats(user.UserId);
+
+            botClient.SendMessage(chat,
+                $"Статистика по задачам на {generatedAt:dd.MM.yyyy HH:mm:ss}. " +
+                $"Всего: {total}; Завершенных: {completed}; Активных: {active};");
+        }
+        private void HandleFind(ITelegramBotClient botClient, Chat chat, ToDoUser user, string argument)
+        {
+            if (string.IsNullOrWhiteSpace(argument))
+            {
+                botClient.SendMessage(chat, "Укажите префикс имени. Пример: /find Купить");
+                return;
+            }
+
+            var found = _toDoService.Find(user, argument);
+
+            if (found.Count == 0)
+            {
+                botClient.SendMessage(chat, $"Задачи, начинающиеся на \"{argument}\", не найдены.");
+                return;
+            }
+
+            var lines = found.Select((item, i) =>
+                $"  {i + 1}. {item.Name} - {item.CreatedAt:dd.MM.yyyy HH:mm:ss} - {item.Id}");
+
+            botClient.SendMessage(chat,
+                $"Найденные задачи по префиксу \"{argument}\":\n" + string.Join("\n", lines));
         }
     }
 }
