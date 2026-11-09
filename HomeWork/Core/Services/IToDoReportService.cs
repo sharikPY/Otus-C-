@@ -1,10 +1,11 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
-namespace HomeWork.Core.Services
+namespace FastPekar.Core.Services
 {
-    internal interface IToDoReportService
+    public interface IToDoReportService
     {
+        Task<(int total, int completed, int active, DateTime generatedAt)> GetUserStatsAsync(Guid userId, CancellationToken ct);
     }
 }

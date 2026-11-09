@@ -1,12 +1,11 @@
 ﻿using System;
 
-namespace FastPekar
+namespace FastPekar.Core.Exceptions;
+
+public class DuplicateTaskException : Exception
 {
-    public class DuplicateTaskException : Exception
+    public DuplicateTaskException(string task)
+        : base($"Задача '{task}' уже существует")
     {
-        public DuplicateTaskException(string task)
-            : base($"Задача '{task}' уже существует")
-        {
-        }
     }
 }

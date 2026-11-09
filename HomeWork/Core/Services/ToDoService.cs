@@ -1,10 +1,13 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
 using FastPekar.Core.DataAccess;
-using FastPekar.Entities;
-using FastPekar.Exceptions;
+using FastPekar.Core.Entities;
+using FastPekar.Core.Exceptions;
 
-namespace FastPekar.Services
+
+namespace FastPekar.Core.Services
 {
     public class ToDoService : IToDoService
     {
@@ -19,27 +22,20 @@ namespace FastPekar.Services
             _maxTaskLength = maxTaskLength;
         }
 
-        public IReadOnlyList<ToDoItem> GetAllByUserId(Guid userId)
+        public Task<IReadOnlyList<ToDoItem>> GetAllByUserIdAsync(Guid userId, CancellationToken ct)
         {
-            return _toDoRepository.GetAllByUserId(userId);
+            return _toDoRepository.GetAllByUserIdAsync(userId, ct);
         }
 
-        public IReadOnlyList<ToDoItem> GetActiveByUserId(Guid userId)
+        public Task<IReadOnlyList<ToDoItem>> GetActiveByUserIdAsync(Guid userId, CancellationToken ct)
         {
-            return _toDoRepository.GetActiveByUserId(userId);
-        }
-        public IReadOnlyList<ToDoItem> Find(ToDoUser user, string namePrefix)
-        {
-            if (string.IsNullOrWhiteSpace(namePrefix))
-                return Array.Empty<ToDoItem>();
-
-            return _toDoRepository.Find(user.UserId,
-                t => t.Name.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase));
+            return _toDoRepository.GetActiveByUserIdAsync(userId, ct);
         }
 
-        public ToDoItem Add(ToDoUser user, string name)
+        public async Task<ToDoItem> AddAsync(ToDoUser user, string name, CancellationToken ct)
         {
-            if (_toDoRepository.CountActive(user.UserId) >= _maxTaskCount)
+            int activeCount = await _toDoRepository.CountActiveAsync(user.UserId, ct);
+            if (activeCount >= _maxTaskCount)
                 throw new TaskCountLimitException(_maxTaskCount);
 
             if (string.IsNullOrWhiteSpace(name))
@@ -50,28 +46,40 @@ namespace FastPekar.Services
             if (trimmed.Length > _maxTaskLength)
                 throw new TaskLengthLimitException(trimmed.Length, _maxTaskLength);
 
-            if (_toDoRepository.ExistsByName(user.UserId, trimmed))
+            bool exists = await _toDoRepository.ExistsByNameAsync(user.UserId, trimmed, ct);
+            if (exists)
                 throw new DuplicateTaskException(trimmed);
 
             var item = new ToDoItem(user, trimmed);
-            _toDoRepository.Add(item);
+            await _toDoRepository.AddAsync(item, ct);
             return item;
         }
 
-        public void MarkCompleted(Guid id)
+        public async Task MarkCompletedAsync(Guid id, CancellationToken ct)
         {
-            var item = _toDoRepository.Get(id);
+            var item = await _toDoRepository.GetAsync(id, ct);
             if (item == null)
                 return;
 
             item.State = ToDoItemState.Completed;
             item.StateChangedAt = DateTime.UtcNow;
-            _toDoRepository.Update(item);
+            await _toDoRepository.UpdateAsync(item, ct);
         }
 
-        public void Delete(Guid id)
+        public Task DeleteAsync(Guid id, CancellationToken ct)
         {
-            _toDoRepository.Delete(id);
+            return _toDoRepository.DeleteAsync(id, ct);
+        }
+
+        public Task<IReadOnlyList<ToDoItem>> FindAsync(ToDoUser user, string namePrefix, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(namePrefix))
+            {
+                return Task.FromResult<IReadOnlyList<ToDoItem>>(Array.Empty<ToDoItem>());
+            }
+
+            return _toDoRepository.FindAsync(user.UserId,
+                t => t.Name.StartsWith(namePrefix, StringComparison.OrdinalIgnoreCase), ct);
         }
     }
 }

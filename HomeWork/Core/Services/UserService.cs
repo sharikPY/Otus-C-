@@ -1,22 +1,29 @@
-﻿using System.Collections.Generic;
-using System.Linq;
+﻿using System.Threading;
+using System.Threading.Tasks;
+using FastPekar.Core.DataAccess;
+using FastPekar.Core.Entities;
 
-namespace FastPekar
+namespace FastPekar.Core.Services
 {
     public class UserService : IUserService
     {
-        private readonly List<ToDoUser> _users = new();
+        private readonly IUserRepository _userRepository;
 
-        public ToDoUser RegisterUser(long telegramUserId, string telegramUserName)
+        public UserService(IUserRepository userRepository)
+        {
+            _userRepository = userRepository;
+        }
+
+        public async Task<ToDoUser> RegisterUserAsync(long telegramUserId, string telegramUserName, CancellationToken ct)
         {
             var user = new ToDoUser(telegramUserId, telegramUserName);
-            _users.Add(user);
+            await _userRepository.AddAsync(user, ct);
             return user;
         }
 
-        public ToDoUser? GetUser(long telegramUserId)
+        public Task<ToDoUser?> GetUserAsync(long telegramUserId, CancellationToken ct)
         {
-            return _users.FirstOrDefault(u => u.TelegramUserId == telegramUserId);
+            return _userRepository.GetUserByTelegramUserIdAsync(telegramUserId, ct);
         }
     }
 }

@@ -1,7 +1,8 @@
 ﻿using System;
 
-namespace FastPekar
+namespace FastPekar.Core.Entities
 {
+
     public class ToDoItem
     {
         public Guid Id { get; }
